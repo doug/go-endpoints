@@ -70,7 +70,7 @@ func (s *BackendService) GetApiConfigs(
 
 	resp.Items = make([]string, 0)
 	for _, service := range s.server.services.services {
-		if service.internal {
+		if service.Internal {
 			continue
 		}
 		d := &ApiDescriptor{}
@@ -102,7 +102,7 @@ func (s *BackendService) GetFirstConfig(
 	r *http.Request, _ *VoidMessage, resp *ApiDescriptor) error {
 
 	for _, service := range s.server.services.services {
-		if !service.internal {
+		if !service.Internal {
 			return service.ApiDescriptor(resp, r.Host)
 		}
 	}

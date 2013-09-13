@@ -1,5 +1,4 @@
-// Copyright 2009 The Go Authors. All rights reserved.
-// Copyright 2012 The Gorilla Authors. All rights reserved.
+// Copyright 2009 The Go Authors. All rights reserved// Copyright 2012 The Gorilla Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -28,30 +27,19 @@ var (
 
 // RpcService represents a service registered with a specific Server.
 type RpcService struct {
-	name     string                    // name of service
-	rcvr     reflect.Value             // receiver of methods for the service
-	rcvrType reflect.Type              // type of the receiver
-	methods  map[string]*ServiceMethod // registered methods
+	Name     string                    // name of service
+	Rcvr     reflect.Value             // receiver of methods for the service
+	RcvrType reflect.Type              // type of the receiver
+	Methods  map[string]*ServiceMethod // registered methods
 
-	internal bool
-	info     *ServiceInfo
-}
-
-// Name returns service method name
-// TODO: remove or use info.Name here?
-func (s *RpcService) Name() string {
-	return s.name
-}
-
-// Info returns a ServiceInfo which is used to construct Endpoints API config
-func (s *RpcService) Info() *ServiceInfo {
-	return s.info
+	Internal bool
+	Info     *ServiceInfo
 }
 
 // Methods returns a slice of all service's registered methods
-func (s *RpcService) Methods() []*ServiceMethod {
-	items := make([]*ServiceMethod, 0, len(s.methods))
-	for _, m := range s.methods {
+func (s *RpcService) MethodList() []*ServiceMethod {
+	items := make([]*ServiceMethod, 0, len(s.Methods))
+	for _, m := range s.Methods {
 		items = append(items, m)
 	}
 	return items
@@ -59,7 +47,7 @@ func (s *RpcService) Methods() []*ServiceMethod {
 
 // MethodByName returns a ServiceMethod of a registered service's method or nil.
 func (s *RpcService) MethodByName(name string) *ServiceMethod {
-	return s.methods[name]
+	return s.Methods[name]
 }
 
 // ServiceInfo is used to construct Endpoints API config
@@ -77,14 +65,9 @@ type ServiceMethod struct {
 	// Type of the response data structure
 	RespType reflect.Type
 	// method's receiver
-	method *reflect.Method
+	Method *reflect.Method
 	// info used to construct Endpoints API config
-	info *MethodInfo
-}
-
-// Info returns a MethodInfo struct of a registered service's method
-func (m *ServiceMethod) Info() *MethodInfo {
-	return m.info
+	Info *MethodInfo
 }
 
 // MethodInfo is what's used to construct Endpoints API config
@@ -110,7 +93,7 @@ type serviceMap struct {
 }
 
 // register adds a new service using reflection to extract its methods.
-// 
+//
 // internal == true indicase that this is an internal service,
 // e.g. BackendService
 func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault, internal bool) (
@@ -118,55 +101,59 @@ func (m *serviceMap) register(srv interface{}, name, ver, desc string, isDefault
 
 	// Setup service.
 	s := &RpcService{
-		rcvr:     reflect.ValueOf(srv),
-		rcvrType: reflect.TypeOf(srv),
-		methods:  make(map[string]*ServiceMethod),
-		internal: internal,
+		Rcvr:     reflect.ValueOf(srv),
+		RcvrType: reflect.TypeOf(srv),
+		Methods:  make(map[string]*ServiceMethod),
+		Internal: internal,
 	}
-	s.name = reflect.Indirect(s.rcvr).Type().Name()
-	if !isExported(s.name) {
+	s.Name = reflect.Indirect(s.Rcvr).Type().Name()
+	if !isExported(s.Name) {
 		return nil, fmt.Errorf("endpoints: no service name for type %q",
-			s.rcvrType.String())
+			s.RcvrType.String())
 	}
 
 	if !internal {
-		s.info = &ServiceInfo{
+		s.Info = &ServiceInfo{
 			Name:        name,
 			Version:     ver,
 			Default:     isDefault,
 			Description: desc,
 		}
-		if s.info.Name == "" {
-			s.info.Name = s.name
+		if s.Info.Name == "" {
+			s.Info.Name = s.Name
 		}
-		s.info.Name = strings.ToLower(s.info.Name)
-		if s.info.Version == "" {
-			s.info.Version = "v1"
+		s.Info.Name = strings.ToLower(s.Info.Name)
+		if s.Info.Version == "" {
+			s.Info.Version = "v1"
 		}
 	}
 
 	// Setup methods.
-	for i := 0; i < s.rcvrType.NumMethod(); i++ {
-		method := s.rcvrType.Method(i)
+	for i := 0; i < s.RcvrType.NumMethod(); i++ {
+		method := s.RcvrType.Method(i)
 		srvMethod := newServiceMethod(&method, internal)
 		if srvMethod != nil {
-			s.methods[method.Name] = srvMethod
+			s.Methods[method.Name] = srvMethod
 		}
 	}
-	if len(s.methods) == 0 {
+	if len(s.Methods) == 0 {
 		return nil, fmt.Errorf(
-			"endpoints: %q has no exported methods of suitable type", s.name)
+			"endpoints: %q has no exported methods of suitable type", s.Name)
 	}
 
+	return m.add(s)
+}
+
+func (m *serviceMap) add(s *RpcService) (*RpcService, error) {
 	// Add to the map.
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if m.services == nil {
 		m.services = make(map[string]*RpcService)
-	} else if _, ok := m.services[s.name]; ok {
-		return nil, fmt.Errorf("endpoints: service already defined: %q", s.name)
+	} else if _, ok := m.services[s.Name]; ok {
+		return nil, fmt.Errorf("endpoints: service already defined: %q", s.Name)
 	}
-	m.services[s.name] = s
+	m.services[s.Name] = s
 	return s, nil
 }
 
@@ -204,28 +191,28 @@ func newServiceMethod(m *reflect.Method, internal bool) *ServiceMethod {
 	}
 
 	method := &ServiceMethod{
-		method:   m,
+		Method:   m,
 		ReqType:  args.Elem(),
 		RespType: reply.Elem(),
 	}
 	if !internal {
 		mname := strings.ToLower(m.Name)
-		method.info = &MethodInfo{Name: mname}
+		method.Info = &MethodInfo{Name: mname}
 
 		params := requiredParamNames(method.ReqType)
 		numParam := len(params)
 		if method.ReqType.Kind() == reflect.Struct {
 			switch {
 			default:
-				method.info.HttpMethod = "POST"
+				method.Info.HttpMethod = "POST"
 			case numParam == method.ReqType.NumField():
-				method.info.HttpMethod = "GET"
+				method.Info.HttpMethod = "GET"
 			}
 		}
 		if numParam == 0 {
-			method.info.Path = mname
+			method.Info.Path = mname
 		} else {
-			method.info.Path = mname + "/{" + strings.Join(params, "}/{") + "}"
+			method.Info.Path = mname + "/{" + strings.Join(params, "}/{") + "}"
 		}
 	}
 	return method
@@ -272,13 +259,13 @@ func (m *serviceMap) get(method string) (*RpcService, *ServiceMethod, error) {
 		err := fmt.Errorf("endpoints: can't find service %q", parts[0])
 		return nil, nil, err
 	}
-	ServiceMethod := service.methods[parts[1]]
-	if ServiceMethod == nil {
+	serviceMethod := service.Methods[parts[1]]
+	if serviceMethod == nil {
 		err := fmt.Errorf(
 			"endpoints: can't find method %q of service %q", parts[1], parts[0])
 		return nil, nil, err
 	}
-	return service, ServiceMethod, nil
+	return service, serviceMethod, nil
 }
 
 // serviceByName returns a registered service or nil if there's no service

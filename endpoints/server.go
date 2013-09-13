@@ -97,6 +97,15 @@ func (s *Server) RegisterService(srv interface{}, name, ver, desc string, isDefa
 	return s.services.register(srv, name, ver, desc, isDefault, false)
 }
 
+// RegisterRpcService adds a defined RpcService object to the server
+//
+// This will be rarely used, as RegisterService does a good deal of benefitial reflection
+// for you to create the RpcService, but in cases where a library wants to generate an RpcService
+// it becomes useful to have this additional functionality.
+func (s *Server) RegisterRpcService(srv *RpcService) (*RpcService, error) {
+	return s.services.add(srv)
+}
+
 // RegisterServiceWithDefaults will register provided service and will try to
 // infer Endpoints config params from its method names and types.
 // See RegisterService for details.
@@ -161,6 +170,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Debugf("SPI request body: %s", body)
+	//log.Printf("SPI request body: %s", body)
 
 	// if err := json.NewDecoder(r.Body).Decode(req.Interface()); err != nil {
 	// 	writeError(w, fmt.Errorf("Error while decoding JSON: %q", err))
@@ -173,8 +183,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Initialize RPC method response and call method's function
 	resp := reflect.New(methodSpec.RespType)
-	errValue := methodSpec.method.Func.Call([]reflect.Value{
-		serviceSpec.rcvr,
+	errValue := methodSpec.Method.Func.Call([]reflect.Value{
+		serviceSpec.Rcvr,
 		reflect.ValueOf(r),
 		req,
 		resp,
@@ -209,6 +219,12 @@ func RegisterService(srv interface{}, name, ver, desc string, isDefault bool) (
 	*RpcService, error) {
 
 	return DefaultServer.RegisterService(srv, name, ver, desc, isDefault)
+}
+
+// RegisterRpcService registers an RpcService using DefaultServer.
+// See Server.RegisterRpcService for details.
+func RegisterRpcService(srv *RpcService) (*RpcService, error) {
+	return DefaultServer.RegisterRpcService(srv)
 }
 
 // RegisterServiceWithDefaults registers a service using DefaultServer.

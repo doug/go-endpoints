@@ -116,11 +116,11 @@ type ApiSchemaProperty struct {
 
 // ApiDescriptor populates provided ApiDescriptor with all info needed to
 // generate a discovery doc from its receiver.
-// 
+//
 // Args:
 //   - dst, a non-nil pointer to ApiDescriptor struct
 //   - host, a hostname used for discovery API config Root and BNS.
-//   
+//
 // Returns error if malformed params were encountered
 // (e.g. ServerMethod.Path, etc.)
 func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
@@ -133,27 +133,27 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 
 	dst.Extends = "thirdParty.api"
 	dst.Root = fmt.Sprintf("https://%s/_ah/api", host)
-	dst.Name = s.Info().Name
-	dst.Version = s.Info().Version
-	dst.Default = s.Info().Default
-	dst.Desc = s.Info().Description
+	dst.Name = s.Info.Name
+	dst.Version = s.Info.Version
+	dst.Default = s.Info.Default
+	dst.Desc = s.Info.Description
 
 	dst.Adapter.Bns = fmt.Sprintf("https://%s/_ah/spi", host)
 	dst.Adapter.Type = "lily"
 
 	schemasToCreate := make(map[string]reflect.Type, 0)
-	methods := s.Methods()
+	methods := s.MethodList()
 	numMethods := len(methods)
 
 	dst.Methods = make(map[string]*ApiMethod, numMethods)
 	dst.Descriptor.Methods = make(map[string]*ApiMethodDescriptor, numMethods)
 
 	for _, m := range methods {
-		info := m.Info()
+		info := m.Info
 
 		// Methods of $SCHEMA_DESCRIPTOR
 		mdescr := &ApiMethodDescriptor{serviceMethod: m}
-		dst.Descriptor.Methods[s.Name()+"."+m.method.Name] = mdescr
+		dst.Descriptor.Methods[s.Name+"."+m.Method.Name] = mdescr
 		if !info.isBodiless() && !isEmptyStruct(m.ReqType) {
 			refId := m.ReqType.Name()
 			mdescr.Request = &ApiSchemaRef{Ref: refId}
@@ -166,7 +166,7 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 		}
 
 		// $METHOD_MAP
-		apimeth, err := mdescr.toApiMethod(s.Name())
+		apimeth, err := mdescr.toApiMethod(s.Name)
 		if err != nil {
 			return err
 		}
@@ -185,16 +185,16 @@ func (s *RpcService) ApiDescriptor(dst *ApiDescriptor, host string) error {
 }
 
 // toApiMethod creates a new ApiMethod using its receiver info and provided
-// rosy service name. 
-// 
+// rosy service name.
+//
 // Args:
 //   - rosySrv, original name of a service, e.g. "MyService"
 func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
-	info := md.serviceMethod.Info()
+	info := md.serviceMethod.Info
 	apim := &ApiMethod{
 		Path:       info.Path,
 		HttpMethod: info.HttpMethod,
-		RosyMethod: rosySrv + "." + md.serviceMethod.method.Name,
+		RosyMethod: rosySrv + "." + md.serviceMethod.Method.Name,
 		Scopes:     info.Scopes,
 		Audiences:  info.Audiences,
 		ClientIds:  info.ClientIds,
@@ -202,7 +202,7 @@ func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
 	}
 
 	var err error
-	if md.serviceMethod.Info().isBodiless() {
+	if md.serviceMethod.Info.isBodiless() {
 		apim.Request.Params, err = typeToParamsSpec(md.serviceMethod.ReqType)
 	} else {
 		apim.Request.Params, err = typeToParamsSpecFromPath(
@@ -219,7 +219,7 @@ func (md *ApiMethodDescriptor) toApiMethod(rosySrv string) (*ApiMethod, error) {
 
 // addSchemaFromType creates a new ApiSchemaDescriptor from given Type t
 // and adds it to the map with the key of type's name name.
-// 
+//
 // Returns an error if ApiSchemaDescriptor cannot be created from this Type.
 func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) error {
 	if t.Name() == "" {
@@ -316,7 +316,7 @@ func addSchemaFromType(dst map[string]*ApiSchemaDescriptor, t reflect.Type) erro
 
 // setApiReqRespBody populates ApiReqRespDescriptor with correct values based
 // on provided arguments.
-// 
+//
 // Args:
 //   - d, a non-nil pointer of ApiReqRespDescriptor to populate
 //   - template, either "backendRequest" or "backendResponse"
@@ -411,7 +411,7 @@ func typeToPropFormat(t reflect.Type) (string, string) {
 
 // typeToParamsSpec creates a new ApiRequestParamSpec map from a Type for all
 // fields in t.
-// 
+//
 // Normally, t is a Struct type and it's what an original service method
 // expects as input (request arg).
 func typeToParamsSpec(t reflect.Type) (
@@ -437,7 +437,7 @@ func typeToParamsSpec(t reflect.Type) (
 
 // typeToParamsSpecFromPath is almost the same as typeToParamsSpec but considers
 // only those params present in template path.
-// 
+//
 // path template is is something like "some/{a}/path/{b}".
 func typeToParamsSpecFromPath(t reflect.Type, path string) (
 	map[string]*ApiRequestParamSpec, error) {
@@ -475,7 +475,7 @@ func typeToParamsSpecFromPath(t reflect.Type, path string) (
 
 // fieldToParamSpec creates a ApiRequestParamSpec from the given StructField.
 // It returns error if the field's kind/type is not supported.
-// 
+//
 // See parseTag() method for supported tag options.
 func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err error) {
 	p = &ApiRequestParamSpec{}
@@ -527,10 +527,10 @@ func fieldToParamSpec(field *reflect.StructField) (p *ApiRequestParamSpec, err e
 // fieldNames loops over each field of t and creates a map of
 // fieldName (string) => *StructField where fieldName is extracted from json
 // field tag. Defaults to StructField.Name.
-// 
+//
 // It expands (flattens) nexted structs if flatten == true, and always skips
 // unexported fields or thosed tagged with json:"-"
-// 
+//
 // This method accepts only reflect.Struct type. Passing other types will
 // most likely make it panic.
 func fieldNames(t reflect.Type, flatten bool) map[string]*reflect.StructField {
@@ -578,18 +578,18 @@ type endpointsTag struct {
 const endpointsTagName = "endpoints"
 
 // parseTag parses "endpoints" field tag into endpointsTag struct.
-// 
+//
 //   type MyMessage struct {
 //       SomeField int `endpoints:"req,min=0,max=100,desc="Int field"`
 //       WithDefault string `endpoints:"d=Hello gopher"`
 //   }
-//   
+//
 //   - req, required (boolean)
 //   - d=val, default value
 //   - min=val, min value
 //   - max=val, max value
 //   - desc=val, description
-// 
+//
 // It is an error to specify both default and required.
 func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 	eTag := &endpointsTag{}
@@ -628,7 +628,7 @@ func parseTag(t reflect.StructTag) (*endpointsTag, error) {
 
 // parsePath parses a path template and returns found placeholders.
 // It returns error if the template is malformed.
-// 
+//
 // For instance, parsePath("one/{a}/two/{b}") will return []string{"a","b"}.
 func parsePath(path string) ([]string, error) {
 	params := make([]string, 0)
